@@ -280,6 +280,11 @@ def _max_by_axis(the_list):
     return maxes
 
 
+"""
+这里会转成nested_tensor, 这个nestd_tensor是什么类型呢？简单说就是把{tensor， mask}打包在一起, 
+tensor就是我么的图片的值，那么mask是什么呢? 当一个batch中的图片大小不一样的时候，我们要把它们处理的整齐，
+简单说就是把图片都padding成最大的尺寸，padding的方式就是补零，那么batch中的每一张图都有一个mask矩阵，所以mask大小为[2, 200,250], tensor大小为[2,3,200,250]。
+"""
 def nested_tensor_from_tensor_list(tensor_list: List[Tensor]):
     # TODO make this more general
     if tensor_list[0].ndim == 3:

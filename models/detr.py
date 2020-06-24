@@ -36,6 +36,10 @@ class DETR(nn.Module):
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
+
+        """
+        Object Query是一组nn.Embedding的weight（就是一组学到的参数）。我们这样的架构希望这组embedding学习到什么内容呢？
+        """
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -62,6 +66,11 @@ class DETR(nn.Module):
 
         src, mask = features[-1].decompose()
         assert mask is not None
+
+        """
+        目前我们拥有src=[ 2, 2048,7,8]，mask=[2,7,8], pos=[1,2,256,7,8]
+        input_proj：一个卷积层，卷积核为1*1，说白了就是将压缩通道的作用，将2048压缩到256，所以传入transformer的维度是压缩后的[2,256,7,8]。
+        """
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
 
         outputs_class = self.class_embed(hs)

@@ -69,6 +69,20 @@ class BackboneBase(nn.Module):
         self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.num_channels = num_channels
 
+    """
+    接下里就是把tensor, 也就是图片输入到特征提取器中，这里作者使用的是残差网络，我做实验的时候用多个resnet-50, 所以tensor经过resnet-50后的结果就是[2,2048,7,8],下面是残差网络最后一层的结构。
+
+    (2): Bottleneck(
+    (conv1): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+    (bn1): FrozenBatchNorm2d()
+    (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+    (bn2): FrozenBatchNorm2d()
+    (conv3): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+    (bn3): FrozenBatchNorm2d()
+    (relu): ReLU(inplace=True)
+
+    还有个mask, mask采用的方式F.interpolate，最后得到的结果是[2,7,8]
+    """
     def forward(self, tensor_list: NestedTensor):
         xs = self.body(tensor_list.tensors)
         out: Dict[str, NestedTensor] = {}
@@ -92,7 +106,9 @@ class Backbone(BackboneBase):
         num_channels = 512 if name in ('resnet18', 'resnet34') else 2048
         super().__init__(backbone, train_backbone, num_channels, return_interm_layers)
 
-
+"""
+将backbone和position embedding合并在一起
+"""
 class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
         super().__init__(backbone, position_embedding)

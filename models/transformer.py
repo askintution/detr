@@ -43,7 +43,7 @@ class Transformer(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-
+                
     def forward(self, src, mask, query_embed, pos_embed):
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src.shape
@@ -53,7 +53,24 @@ class Transformer(nn.Module):
         mask = mask.flatten(1)
 
         tgt = torch.zeros_like(query_embed)
+
+        """
+        encoder的输入为：src, mask, pos_embed
+        得到输出memory, memory的size依然为[56, 2, 256].
+        """
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+
+        """
+        memory:这个就是encoder的输出，size为[56,2,256]
+        mask:还是上面的mask
+        pos_embed:还是上面的pos_embed
+        query_embed:这个query_embed其实是一个varible，size=[100,2,256],由训练得到，结束后就固定下来了。
+        tgt: 每一层的decoder的输入，第一层的话等于0
+
+        如果你不知道100是啥，那你多少需要看一眼论文，这个100表示将要预测100个目标框，你问为什么是100框，因为作者用的数据集的目标种类有90个，
+        万一一个图上有90个目标你至少都能检测出来吧，所以100个框合理。此外这里和语言模型的输入有很大区别，比如翻译时自回归，也就是说翻译出一个字，
+        然后把这个字作为下一个解码的输入（这里看不懂的可以去看我博客里将transformer的那一篇），作者这里直接用[100, 256]作为输入感觉也是蛮厉害的。
+        """
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
@@ -83,6 +100,9 @@ class TransformerEncoder(nn.Module):
         return output
 
 
+"""
+DETR的Decoder也加了Positional Encoding。
+"""
 class TransformerDecoder(nn.Module):
 
     def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False):
@@ -209,6 +229,23 @@ class TransformerDecoderLayer(nn.Module):
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
         return tensor if pos is None else tensor + pos
 
+
+    """
+    相比pre，pre将LayerNorm放在输入端，而post将LayerNorm放在输出端
+    每一层的decoder的输入)+ Position Embedding
+    Self MultiheadAttention
+    residual block
+
+    LayerNorm
+    Self MultiheadAttention
+    redidual block
+    
+    LayerNorm
+    linear1 + activation + dropout + linear2
+    redidual block
+
+    LayerNorm
+    """
     def forward_post(self, tgt, memory,
                      tgt_mask: Optional[Tensor] = None,
                      memory_mask: Optional[Tensor] = None,
@@ -232,6 +269,19 @@ class TransformerDecoderLayer(nn.Module):
         tgt = self.norm3(tgt)
         return tgt
 
+    """
+    LayerNorm(每一层的decoder的输入) + Position Embedding
+    Self MultiheadAttention
+    residual block
+
+    LayerNorm
+    Self MultiheadAttention
+    redidual block
+    
+    LayerNorm
+    linear1 + activation + dropout + linear2
+    redidual block
+    """
     def forward_pre(self, tgt, memory,
                     tgt_mask: Optional[Tensor] = None,
                     memory_mask: Optional[Tensor] = None,
@@ -254,6 +304,7 @@ class TransformerDecoderLayer(nn.Module):
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
         tgt = tgt + self.dropout3(tgt2)
         return tgt
+
 
     def forward(self, tgt, memory,
                 tgt_mask: Optional[Tensor] = None,

@@ -9,6 +9,10 @@ from torch import nn
 from util.misc import NestedTensor
 
 
+"""
+三角函数的方式获取position_embediing
+
+"""
 class PositionEmbeddingSine(nn.Module):
     """
     This is a more standard version of the position embedding, very similar to the one
@@ -25,6 +29,9 @@ class PositionEmbeddingSine(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
 
+    """
+    position_embediing的输入是上面的NestedTensor={tensor,mask}, 输出最终pos的size为[1,2,256,7,8]。
+    """
     def forward(self, tensor_list: NestedTensor):
         x = tensor_list.tensors
         mask = tensor_list.mask
@@ -76,6 +83,11 @@ class PositionEmbeddingLearned(nn.Module):
         return pos
 
 
+"""
+两种postion方式
+1. PositionEmbeddingSine
+2. PositionEmbeddingLearned
+"""
 def build_position_encoding(args):
     N_steps = args.hidden_dim // 2
     if args.position_embedding in ('v2', 'sine'):
